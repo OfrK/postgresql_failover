@@ -1,0 +1,157 @@
+FROM centos:7
+MAINTAINER CFMC\gtamanov <gtamanov@cfmc.ru>
+#LABEL Remarks="postgres  repmgr  pgpool"
+
+ENV PRIMARY_CONNINFO=''
+
+ARG node_id
+ARG host_ip
+ARG postgresql_port
+ARG priority
+ARG REPMGR_USER
+ARG REPMGR_USER_PASSWORD
+ARG REPMGR_DB
+
+# for centos systemd
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*;
+
+# install services
+USER root:root
+RUN \
+rm -rf /var/lib/pgsql/11/data&&\
+rpm -Uvh https://yum.postgresql.org/11/redhat/rhel-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm&&\
+yum install postgresql11.x86_64 -y&&\
+yum install postgresql11-server.x86_64 -y&&\
+yum install postgresql11-contrib.x86_64 -y&&\
+yum install repmgr11.x86_64 -y &&\
+yum install openssh-server openssh-clients -y &&\
+yum install sudo -y&&\
+yum install net-tools -y &&\
+yum clean all&&\
+usermod -aG wheel postgres;
+
+# postgres init database
+USER postgres:postgres
+RUN \
+/usr/pgsql-11/bin/initdb -D /var/lib/pgsql/11/data&&\
+chown postgres:postgres -R /var/lib/pgsql/11*;
+
+USER root:root
+#ADD https://drive.google.com/uc?export=download&confirm=no_antivirus&id=1trCZC0z_TXi8hDHzeTtV3rYFAKu2xC47 /var/lib/pgsql/11/data/postgresql.conf
+#ADD https://drive.google.com/uc?export=download&confirm=no_antivirus&id=173a2fe5jvUjqTX052CPXn1hZSjbLJqba /var/lib/pgsql/11/data/pg_hba.conf
+ADD /postgresql_repmgr/configuration/pg_hba.conf /var/lib/pgsql/11/data/pg_hba.conf
+ADD /postgresql_repmgr/configuration/postgresql.conf /var/lib/pgsql/11/data/postgresql.conf
+# scripts
+ADD /postgresql_repmgr/configuration/scripts/failover.conf /etc/repmgr/11/failover.conf
+ADD /postgresql_repmgr/configuration/scripts/failover.sh /etc/repmgr/11/failover.sh
+ADD /postgresql_repmgr/configuration/scripts/promote.sh /etc/repmgr/11/promote.sh
+ADD /postgresql_repmgr/configuration/scripts/repair_node.sh /etc/repmgr/11/repair_node.sh
+ADD /postgresql_repmgr/configuration/scripts/sudoers /etc/repmgr/11/sudoers
+ADD /postgresql_repmgr/configuration/scripts/initialize_node.sh /etc/repmgr/11/initialize_node.sh
+
+# scripts install
+USER root:root
+RUN \
+cat /etc/repmgr/11/sudoers >> /etc/sudoers&&\
+chmod 755 /etc/repmgr/11/failover.conf&&\
+chmod 755 /etc/repmgr/11/failover.sh&&\
+chmod 755 /etc/repmgr/11/promote.sh&&\
+chmod 755 /etc/repmgr/11/repair_node.sh&&\
+chmod 755 /etc/repmgr/11/initialize_node.sh;
+
+#ssh user postgres
+USER postgres:postgres
+RUN \
+ssh-keygen -t rsa -f ~postgres/.ssh/id_rsa -N ''&&\
+cat ~postgres/.ssh/id_rsa.pub >> ~postgres/.ssh/authorized_keys&&\
+chmod 600  ~postgres/.ssh/authorized_keys;
+
+# postgres .pgpass
+USER root:root
+RUN \
+echo "*:*:*:${REPMGR_USER}:${REPMGR_USER_PASSWORD}" > ~postgres/.pgpass&&\
+chmod 0600 ~postgres/.pgpass&&\
+chmod 0600 ~postgres/11/data/pg_hba.conf&&\
+chown postgres:postgres -R  ~postgres/*&&\
+chown postgres:postgres -R  ~postgres/.pgpass&&\
+cat  ~postgres/11/data/postgresql.conf&&\
+cat  ~postgres/11/data/pg_hba.conf;
+
+# postgres postgresql.conf
+USER postgres:postgres
+RUN \
+#sed -i "s/#listen_addresses /listen_addresses = \'*\' #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/#shared_preload_libraries /shared_preload_libraries = \'repmgr,pg_stat_statements\' #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/port /port = 5432 #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/#port /port = 5432 #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/log_directory /log_directory = \'\/var\/log\/postgresql\' #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/#log_directory /log_directory = \'\/var\/log\/postgresql\' #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+sed -i "s/#archive_command /archive_command = \'test \! \-f \~postgres\/archive \&\& cp \%p ~postgres\/archive\/%f \&\& rm  \~postgres\/archive\/\%f\' #/g" /var/lib/pgsql/11/data/postgresql.conf&&\
+mkdir ~postgres/archive;
+
+# repmgr repmgr.conf
+USER root:root
+RUN \
+echo "node_id =$node_id" >> /etc/repmgr/11/repmgr.conf&&\
+echo "node_name = '$host_ip'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "conninfo = 'host=$host_ip port=$postgresql_port dbname=$REPMGR_DB user=$REPMGR_USER'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "data_directory ='/var/lib/pgsql/11/data'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "priority =$priority" >> /etc/repmgr/11/repmgr.conf&&\
+echo "passfile ='~postgres/.pgpass'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "repmgrd_service_start_command='/usr/pgsql-11/bin/repmgrd -f /etc/repmgr/11/repmgr.conf'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "repmgrd_service_stop_command='/usr/pgsql-11/bin/repmgr daemon stop'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "log_file='/var/log/repmgr/repmgrd.log'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "failover= automatic" >> /etc/repmgr/11/repmgr.conf&&\
+echo "connection_check_type='ping'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "monitoring_history=yes" >> /etc/repmgr/11/repmgr.conf&&\
+echo "monitor_interval_secs=10" >> /etc/repmgr/11/repmgr.conf&&\
+echo "reconnect_attempts=6" >> /etc/repmgr/11/repmgr.conf&&\
+echo "reconnect_interval=10" >> /etc/repmgr/11/repmgr.conf&&\
+echo "promote_command='/etc/repmgr/11/promote.sh  && /etc/repmgr/11/repair_node.sh --log-to-file'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "follow_command='/usr/pgsql-11/bin/repmgr standby follow -f /etc/repmgr/11/repmgr.conf --log-to-file --upstream-node-id=%n'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "service_start_command = 'sudo systemctl start postgresql-11'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "service_stop_command = 'sudo systemctl stop postgresql-11'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "service_restart_command = 'sudo systemctl restart postgresql-11'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "service_reload_command = 'sudo systemctl reload postgresql-11'" >> /etc/repmgr/11/repmgr.conf;
+
+# logs
+USER root:root
+RUN \
+mkdir /var/log/postgresql&&\
+mkdir ~postgres/log&&\
+echo "create from docker " > /var/log/repmgr/repmgrd.log&&\
+chown postgres:postgres -R /var/log/postgresql&&\
+chown postgres:postgres -R /var/log/repmgr/*&&\
+chown postgres:postgres -R ~postgres/*;
+
+# add links
+RUN \
+systemctl enable sshd&&\
+systemctl enable postgresql-11&&\
+systemctl enable repmgr11;
+
+
+# run postgresql and create db for repmgr
+USER postgres:postgres
+RUN \
+/usr/pgsql-11/bin/pg_ctl start -D /var/lib/pgsql/11/data &&\
+psql -c"create user ${REPMGR_USER} with encrypted password '${REPMGR_USER_PASSWORD}' superuser"&&\
+psql -c"CREATE DATABASE ${REPMGR_DB} with OWNER=${REPMGR_USER}"&&\
+psql -c"ALTER USER ${REPMGR_USER} SET search_path TO repmgr, ${REPMGR_USER}, public;"&&\
+psql -d ${REPMGR_DB} -c"create extension repmgr;"&&\
+psql -a -c"\l" >> ~postgres/test1.test&&\
+/usr/pgsql-11/bin/pg_ctl stop -D /var/lib/pgsql/11/data &&\
+cat ~postgres/test1.test;
+
+USER root:root
+ENTRYPOINT ["/usr/sbin/init"]
+
+#CMD /usr/pgsql-11/bin/repmgr -f /etc/repmgr/11/repmgr.conf

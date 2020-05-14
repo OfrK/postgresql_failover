@@ -1,0 +1,74 @@
+version: "3.3"
+services:
+  postgres_repmgr:
+    environment:
+      PRIMARY_CONNINFO: 'primary' #if primary then register primary when this unregistered, null - nothing, conninfo - add this node to primary
+    container_name: postgres_repmgr
+    hostname: postgres_repmgr_node_1
+    build:
+      context: ./
+      dockerfile: postgresql_repmgr/dockerfile_postgresql_repmgr
+      args:
+        REPMGR_USER: repmgr
+        REPMGR_USER_PASSWORD: repmgr
+        REPMGR_DB: repmgr #name database for repmgr service
+        node_id: 1 #repmgr node id (unique)
+        host_ip: '192.168.1.101' #host ip address this postgresql and repmgr
+        postgresql_port: '5432' #port postgresql
+        priority: 100 #prority change node for new master (repmgr)
+    networks:
+      myvlan:
+        ipv4_address: 192.168.1.101
+    volumes:
+      - pgsql:/var/lib/pgsql/
+      - log:/var/log/postgresql/
+      - log:/var/log/repmgr/
+      - repmgr:/etc/repmgr/11/
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+
+  pgpool_ii:
+    container_name: pgpool_ii
+    hostname: pgpool_ii_node_1
+    build:
+      context: ./
+      dockerfile: pgpool/dockerfile_pgpool
+      args:
+        REPMGR_USER: repmgr
+        REPMGR_USER_PASSWORD: repmgr
+        REPMGR_DB: repmgr #name database for repmgr service
+        PGPOOL_USER: repmgr
+        PGPOOL_USER_PASSWORD: repmgr
+        host_ip: '192.168.1.91' #host ip address this machine
+        delegate_IP: '192.168.1.90' #virtual ip
+    networks:
+      myvlan:
+        ipv4_address: 192.168.1.91
+    volumes:
+      - pgpool:/etc/pgpool-II-11/
+      - pgpool_pgsql:/var/lib/pgsql/
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+    depends_on:
+      - postgres_repmgr
+
+volumes:
+  pgsql:
+    driver: local
+  log:
+    driver: local
+  repmgr:
+    driver: local
+  pgpool:
+    driver: local
+  pgpool_pgsql:
+    driver: local
+
+networks:
+  myvlan:
+    driver: macvlan
+    driver_opts:
+      parent: eth0
+    ipam:
+      config:
+        - subnet: 192.168.1.88/24

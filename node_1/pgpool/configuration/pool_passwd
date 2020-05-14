@@ -1,0 +1,2 @@
+#path /etc/pgpool-II-11/pool_passwd
+#chown root:root

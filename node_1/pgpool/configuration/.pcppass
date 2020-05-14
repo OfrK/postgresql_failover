@@ -1,0 +1,10 @@
+#/var/lib/pgsql/.pcppass
+#chmod 0600 chown postgres:postgres
+
+192.168.1.91:9898:repmgr:repmgr
+192.168.1.92:9898:repmgr:repmgr
+192.168.1.90:9898:repmgr:repmgr
+
+192.168.1.91:9898:pgpool:pgpool
+192.168.1.92:9898:pgpool:pgpool
+192.168.1.90:9898:pgpool:pgpool
