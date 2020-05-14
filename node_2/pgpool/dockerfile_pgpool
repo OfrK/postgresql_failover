@@ -1,0 +1,80 @@
+FROM centos:7
+MAINTAINER CFMC\gtamanov <gtamanov@cfmc.ru>
+#LABEL Remarks="postgres  repmgr  pgpool"
+
+ARG PGPOOL_USER
+ARG PGPOOL_USER_PASSWORD
+ARG delegate_IP
+ARG heartbeat_destination0
+ARG other_pgpool_hostname0
+ARG conninfo
+
+ARG REPMGR_USER
+ARG REPMGR_USER_PASSWORD
+ARG REPMGR_DB
+
+
+# for centos systemd
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*;
+
+# install services
+USER root:root
+RUN \
+rm -rf /var/lib/pgsql/11/data&&\
+rpm -Uvh https://yum.postgresql.org/11/redhat/rhel-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm&&\
+yum install pgpool-II-11.x86_64 -y &&\
+yum install openssh-server openssh-clients -y &&\
+yum install net-tools -y &&\
+yum install nano -y &&\
+yum clean all&&\
+usermod -aG wheel postgres;
+
+USER root:root
+ADD /pgpool/configuration/pgpool.conf /etc/pgpool-II-11/pgpool.conf
+ADD /pgpool/configuration/pool_hba.conf /etc/pgpool-II-11/pool_hba.conf
+ADD /pgpool/configuration/pcp.conf /etc/pgpool-II-11/pcp.conf
+ADD /pgpool/configuration/.pcppass /var/lib/pgsql/.pcppass
+
+#chown home postgres
+USER root:root
+RUN \
+chown postgres:postgres -R /var/lib/pgsql;
+
+# pgpool pool_passwd and pcppass
+USER root:root
+RUN \
+pg_md5 -m -f /etc/pgpool-II-11/pgpool.conf -u ${REPMGR_USER} ${REPMGR_USER_PASSWORD}&&\
+chmod 664 /etc/pgpool-II-11/pool_passwd&&\
+chmod 0600 /var/lib/pgsql/.pcppass&&\
+chown postgres:postgres /var/lib/pgsql/.pcppass;
+
+# net-tools copy
+USER root:root
+RUN \
+cp /usr/sbin/ifconfig /etc/pgpool-II-11/&&\
+cp /usr/sbin/arping /etc/pgpool-II-11/&&\
+chmod 4755 /etc/pgpool-II-11/ifconfig&&\
+chmod 4755 /etc/pgpool-II-11/arping;
+
+#ssh user postgres
+USER postgres:postgres
+RUN \
+ssh-keygen -t rsa -f ~postgres/.ssh/id_rsa -N '';
+
+# add links
+USER root:root
+RUN \
+systemctl enable sshd&&\
+systemctl enable pgpool-II-11;
+
+CMD ["/usr/sbin/init"]
+
+VOLUME [ "/var/lib/pgsql/"]
