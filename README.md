@@ -1,4 +1,12 @@
 # postgresql failover with docker
+## Postgresql Repmgr and Pgpool-II in docker container
+Postgresql + repmgr + pgpool II с автоматическим восстановлением упавшей ноды Запускаются внутри докера на linux, используется macvlan или ipvlan для поднятия интерфейса pgpool II
+
+https://www.postgresql.org/docs/11/index.html \
+https://repmgr.org/docs/current/index.html \
+https://www.pgpool.net/docs/latest/en/html/ \
+https://docs.docker.com/engine/ 
+
 **легенда** 
 - 192.168.48.20 - virtual ip
 - 192.168.48.21 - container pgpool node 1
@@ -10,14 +18,6 @@
 
 1) 2 виртуальные машины с linux kernel version > 4.0
 2) доступ в интернет на виртуальных машинах
-
-
-## Postgresql Repmgr and Pgpool-II in docker container
-Postgresql + repmgr + pgpool II с автоматическим восстановлением упавшей ноды Запускаются внутри докера на linux, используется macvlan или ipvlan для поднятия интерфейса pgpool II
-https://www.postgresql.org/docs/11/index.html
-https://repmgr.org/docs/current/index.html
-https://www.pgpool.net/docs/latest/en/html/
-https://docs.docker.com/engine/
  
 ### Состав
 
