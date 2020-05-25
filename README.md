@@ -16,7 +16,7 @@ https://docs.docker.com/engine/
 ###Состав
 
 Ниже представлен список файлов, в нем присутствует конфигурация контейнера, а так же сервисов.
-
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/1.png)
 1) node_1 - совокупность контейнеров для ноды
 2) configuration - файлы конфигурации для сервисов
 3) scripts - содержит скрипты для сервисов  с их надстройками
@@ -31,50 +31,59 @@ https://docs.docker.com/engine/
 3) Docker network https://docs.docker.com/network/network-tutorial-macvlan/ (kernel linux)
  
 ##Разворачивание контейнеров
-###Подготовка docker-compose
+###Подготовка docker-compose\
 Первое что нужно подготовить - docker-compose, зеленым цветом подсвечено что необходимо менять.\
 Настроить сеть докера, в данной сборке можно использовать macvlan и ipvlan сеть, задается в "driver: " \
 https://docs.docker.com/network/ все по сети
- 
+
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/2.png) 
 
 ###Настройка Postgresql and repmgr
- 
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/3.png)
 
 ###Настройка pgpool-II
- 
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/4.png) 
 
 При желании можно указать свои пути для хранения изменяемых данных 
 ссылка на документацию https://docs.docker.com/storage/volumes/
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/5.png) 
  
-
 При желании можно указать свои пути для хранения изменяемых данных 
 ссылка на документацию https://docs.docker.com/storage/volumes/
-Подготовка конфигураций для сервисов
+
+###Подготовка конфигураций для сервисов
 После редактирования docker-compose можно приступать к настройки конфигураций, данная инструкция повторяется для каждой ноды в кластере один раз и после разворачивается сколько угодно, если не меняются ip адреса
 Список конфигураций для postgresql и repmgr
- 
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/6.png) 
+
 Данные файлы необходимо настроить администратору БД, за исключением repmgr.conf совместно с системным администратором 
 Далее необходимо настроить скрипты для отказоустойчивости
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/7.png) 
  
 Открываем failover.conf, в нем нужно отредактировать строки: 15, 22-23
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/8.png) 
  
 Последнее что нужно редактировать это pgpool-II, pool_hba должен быть как pg_hba
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/9.png) 
  
 pcppass добавить строки ip:9898:repmgr user:repmgr password всех машин которые будут нодами в данном кластере
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/10.png) 
  
 pcp хранит записи пользователь и хэш пароля, генерируется при сборке, можно добавить свои записи
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/11.png) 
  
 pool_passwd содержит записи для доступа пользователей через virtual ip ( delegate ip) pgpool-II , user and md5(pg_shadow postgresql)
 
-###Сборка
+##Сборка
 Чтобы собрать образ, необходимо перейти в директорию где находится docker-compose(file) и выполнить команду docker-compose up --build
 После успешного выполнения можно работать с контейнерами
-Настройка ssh в контейнерах
+###Настройка ssh в контейнерах
 Для работы скриптов по отказоустойчивости нужен ssh для пользователя postgres , при сборке ключи были созданы, их необходимо перенести по следующей схеме
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/12.png) 
  
 "container postgres repmgr" должен ходить на "container pgpool" delegate_ip (pgpool.conf) и на другие "container postgres repmgr"
 
-Настройка master slave в контейнере
+###Настройка master slave в контейнере
 После успешной сборки осталось только зарегистрировать мастера и подключить к нему слейвы
 1.	Чтобы посмотреть имена контейнеров, выполните "docker ps"
 2.	Заходим в контейнер с postgres где будет будущий мастер "docker exec -it -u postgres(or root) 'имя контейнера' bash"
@@ -83,20 +92,13 @@ pool_passwd содержит записи для доступа пользова
 5.	Далее выполняем пункты 1-4 на слевах, за исключением пункта 3, в нем мы пишем initialize_node.sh "Connection string", пример initialize_node.sh "host=192.168.48.23 port=5432 dbname=repmgr user=repmgr", после чего появится слейв
 
 ###Проверка работоспособности
-Зайти в контейнер под пользователем postgres
-docker exec -it -u postgres 'имя контейнера' bash
-Проверим состояние кластера в repmgr"/usr/pgsql-11/bin/repmgr cluster show"
+Зайти в контейнер под пользователем postgres \
+docker exec -it -u postgres 'имя контейнера' bash \
+Проверим состояние кластера в repmgr"/usr/pgsql-11/bin/repmgr cluster show" \
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/13.png) 
 
-ID | Name          | Role    | Status    | Upstream      | Location | Priority | Timeline | Connection string 
-----+---------------+---------+-----------+---------------+----------+----------+----------+-------------------------------------------------------- 
- 1  | 192.168.48.23 | primary | * running |               | default  | 100      | 3        | host=192.168.48.23 port=5432 dbname=repmgr user=repmgr 
- 2  | 192.168.48.24 | standby |   running | 192.168.48.23 | default  | 90       | 3        | host=192.168.48.24 port=5432 dbname=repmgr user=repmgr 
+Проверим состояние кластера в pgpool “psql --port=5434  --host=192.168.48.20 --username=repmgr --dbname repmgr  -c "show pool_nodes" –w” \
+![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/14.png) 
 
-Проверим состояние кластера в pgpool “psql --port=5434  --host=192.168.48.20 --username=repmgr --dbname repmgr  -c "show pool_nodes" –w”
-
-node_id |   hostname    | port | status | lb_weight |  role   | select_cnt | load_balance_node | replication_delay | replication_state | replication_sync_state | last_status_change
----------+---------------+------+--------+-----------+---------+------------+-------------------+-------------------+-------------------+------------------------+---------------------
- 0       | 192.168.48.23 | 5432 | up     | 0.500000  | primary | 0          | true              | 0                 |                   |                        | 2020-05-22 12:11:22
- 1       | 192.168.48.24 | 5432 | up     | 0.500000  | standby | 0          | false             | 0                 |                   |                        | 2020-05-22 12:11:22
 
 
