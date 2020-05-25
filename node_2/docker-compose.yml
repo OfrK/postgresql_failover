@@ -65,7 +65,7 @@ networks:
   myvlan:
     driver: ipvlan
     driver_opts:
-      parent: ens160
+      parent: eth0
     ipam:
       config:
         - subnet: 192.168.48.0/24

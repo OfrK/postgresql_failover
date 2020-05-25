@@ -1,4 +1,10 @@
-# postgresql failover
+# postgresql failover with docker
+#### легенда
+- 192.168.48.20 - virtual ip
+- 192.168.48.21 - container pgpool node 1
+- 192.168.48.22 - container pgpool node 2
+- 192.168.48.23 - container postgres repmgr node 1
+- 192.168.48.24 - container postgres repmgr node 2
 
 ##Требования:
 
@@ -34,8 +40,7 @@ https://docs.docker.com/engine/
 ###Подготовка docker-compose\
 Первое что нужно подготовить - docker-compose, зеленым цветом подсвечено что необходимо менять.\
 Настроить сеть докера, в данной сборке можно использовать macvlan и ipvlan сеть, задается в "driver: " \
-https://docs.docker.com/network/ все по сети
-
+https://docs.docker.com/network/ все по сети \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/2.png) 
 
 ###Настройка Postgresql and repmgr
@@ -45,31 +50,28 @@ https://docs.docker.com/network/ все по сети
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/4.png) 
 
 При желании можно указать свои пути для хранения изменяемых данных 
-ссылка на документацию https://docs.docker.com/storage/volumes/
+ссылка на документацию https://docs.docker.com/storage/volumes/ \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/5.png) 
  
-При желании можно указать свои пути для хранения изменяемых данных 
-ссылка на документацию https://docs.docker.com/storage/volumes/
-
 ###Подготовка конфигураций для сервисов
 После редактирования docker-compose можно приступать к настройки конфигураций, данная инструкция повторяется для каждой ноды в кластере один раз и после разворачивается сколько угодно, если не меняются ip адреса
-Список конфигураций для postgresql и repmgr
+Список конфигураций для postgresql и repmgr \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/6.png) 
 
 Данные файлы необходимо настроить администратору БД, за исключением repmgr.conf совместно с системным администратором 
-Далее необходимо настроить скрипты для отказоустойчивости
+Далее необходимо настроить скрипты для отказоустойчивости \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/7.png) 
  
-Открываем failover.conf, в нем нужно отредактировать строки: 15, 22-23
+Открываем failover.conf, в нем нужно отредактировать строки: 15, 22-23 \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/8.png) 
  
-Последнее что нужно редактировать это pgpool-II, pool_hba должен быть как pg_hba
+Последнее что нужно редактировать это pgpool-II, pool_hba должен быть как pg_hba \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/9.png) 
  
-pcppass добавить строки ip:9898:repmgr user:repmgr password всех машин которые будут нодами в данном кластере
+pcppass добавить строки ip:9898:repmgr user:repmgr password всех машин которые будут нодами в данном кластере \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/10.png) 
  
-pcp хранит записи пользователь и хэш пароля, генерируется при сборке, можно добавить свои записи
+pcp хранит записи пользователь и хэш пароля, генерируется при сборке, можно добавить свои записи \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/11.png) 
  
 pool_passwd содержит записи для доступа пользователей через virtual ip ( delegate ip) pgpool-II , user and md5(pg_shadow postgresql)
@@ -78,7 +80,7 @@ pool_passwd содержит записи для доступа пользова
 Чтобы собрать образ, необходимо перейти в директорию где находится docker-compose(file) и выполнить команду docker-compose up --build
 После успешного выполнения можно работать с контейнерами
 ###Настройка ssh в контейнерах
-Для работы скриптов по отказоустойчивости нужен ssh для пользователя postgres , при сборке ключи были созданы, их необходимо перенести по следующей схеме
+Для работы скриптов по отказоустойчивости нужен ssh для пользователя postgres , при сборке ключи были созданы, их необходимо перенести по следующей схеме \
 ![](https://github.com/g-tamanov/postgresql_failover/raw/master/images_readme/12.png) 
  
 "container postgres repmgr" должен ходить на "container pgpool" delegate_ip (pgpool.conf) и на другие "container postgres repmgr"
