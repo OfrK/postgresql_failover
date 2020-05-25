@@ -11,8 +11,6 @@ ARG conninfo
 
 ARG REPMGR_USER
 ARG REPMGR_USER_PASSWORD
-ARG REPMGR_DB
-
 
 # for centos systemd
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
@@ -41,20 +39,24 @@ USER root:root
 ADD /pgpool/configuration/pgpool.conf /etc/pgpool-II-11/pgpool.conf
 ADD /pgpool/configuration/pool_hba.conf /etc/pgpool-II-11/pool_hba.conf
 ADD /pgpool/configuration/pcp.conf /etc/pgpool-II-11/pcp.conf
+USER postgres:postgres
 ADD /pgpool/configuration/.pcppass /var/lib/pgsql/.pcppass
 
 #chown home postgres
 USER root:root
 RUN \
-chown postgres:postgres -R /var/lib/pgsql;
+chown postgres:postgres -R  ~postgres/;
 
-# pgpool pool_passwd and pcppass
+# pgpool pool_passwd , pcp.conf and pcppass
 USER root:root
 RUN \
 pg_md5 -m -f /etc/pgpool-II-11/pgpool.conf -u ${REPMGR_USER} ${REPMGR_USER_PASSWORD}&&\
+pg_md5 -m -f /etc/pgpool-II-11/pgpool.conf -u ${PGPOOL_USER} ${PGPOOL_USER_PASSWORD}&&\
+vi /etc/pgpool-II-11/pcp.conf -c 'set fileformat=unix' -c 'wq'&&\
+vi /etc/pgpool-II-11/pool_passwd -c 'set fileformat=unix' -c 'wq'&&\
+vi /var/lib/pgsql/.pcppass -c 'set fileformat=unix' -c 'wq'&&\
 chmod 664 /etc/pgpool-II-11/pool_passwd&&\
-chmod 0600 /var/lib/pgsql/.pcppass&&\
-chown postgres:postgres /var/lib/pgsql/.pcppass;
+chmod 0600 /var/lib/pgsql/.pcppass;
 
 # net-tools copy
 USER root:root

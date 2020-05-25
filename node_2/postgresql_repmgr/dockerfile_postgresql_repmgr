@@ -2,11 +2,8 @@ FROM centos:7
 MAINTAINER CFMC\gtamanov <gtamanov@cfmc.ru>
 #LABEL Remarks="postgres  repmgr  pgpool"
 
-ENV PRIMARY_CONNINFO=''
-
 ARG node_id
 ARG host_ip
-ARG postgresql_port
 ARG priority
 ARG REPMGR_USER
 ARG REPMGR_USER_PASSWORD
@@ -35,6 +32,9 @@ yum install repmgr11.x86_64 -y &&\
 yum install openssh-server openssh-clients -y &&\
 yum install sudo -y&&\
 yum install net-tools -y &&\
+yum install pg_qualstats11.x86_64 -y &&\
+yum install pg_stat_kcache11.x86_64 -y &&\
+yum install pg_cron_11.x86_64 -y &&\
 yum clean all&&\
 usermod -aG wheel postgres;
 
@@ -60,12 +60,18 @@ ADD /postgresql_repmgr/configuration/scripts/initialize_node.sh /etc/repmgr/11/i
 # scripts install
 USER root:root
 RUN \
+vi /etc/repmgr/11/sudoers -c 'set fileformat=unix' -c 'wq'&&\
 cat /etc/repmgr/11/sudoers >> /etc/sudoers&&\
 chmod 755 /etc/repmgr/11/failover.conf&&\
+vi /etc/repmgr/11/failover.conf -c 'set fileformat=unix' -c 'wq'&&\
 chmod 755 /etc/repmgr/11/failover.sh&&\
+vi /etc/repmgr/11/failover.sh -c 'set fileformat=unix' -c 'wq'&&\
 chmod 755 /etc/repmgr/11/promote.sh&&\
+vi /etc/repmgr/11/promote.sh -c 'set fileformat=unix' -c 'wq'&&\
 chmod 755 /etc/repmgr/11/repair_node.sh&&\
-chmod 755 /etc/repmgr/11/initialize_node.sh;
+vi /etc/repmgr/11/repair_node.sh -c 'set fileformat=unix' -c 'wq'&&\
+chmod 755 /etc/repmgr/11/initialize_node.sh&&\
+vi /etc/repmgr/11/initialize_node.sh -c 'set fileformat=unix' -c 'wq';
 
 #ssh user postgres
 USER postgres:postgres
@@ -102,7 +108,7 @@ USER root:root
 RUN \
 echo "node_id =$node_id" >> /etc/repmgr/11/repmgr.conf&&\
 echo "node_name = '$host_ip'" >> /etc/repmgr/11/repmgr.conf&&\
-echo "conninfo = 'host=$host_ip port=$postgresql_port dbname=$REPMGR_DB user=$REPMGR_USER'" >> /etc/repmgr/11/repmgr.conf&&\
+echo "conninfo = 'host=$host_ip port=$(cat /var/lib/pgsql/11/data/postgresql.conf | grep 'port =' | cut -d' ' -f 3) dbname=$REPMGR_DB user=$REPMGR_USER'" >> /etc/repmgr/11/repmgr.conf&&\
 echo "data_directory ='/var/lib/pgsql/11/data'" >> /etc/repmgr/11/repmgr.conf&&\
 echo "priority =$priority" >> /etc/repmgr/11/repmgr.conf&&\
 echo "passfile ='~postgres/.pgpass'" >> /etc/repmgr/11/repmgr.conf&&\

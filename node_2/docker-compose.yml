@@ -1,10 +1,8 @@
 version: "3.3"
 services:
   postgres_repmgr:
-    environment:
-      PRIMARY_CONNINFO: '' #if primary then register primary when this unregistered, null - nothing, conninfo - add this node to primary
     container_name: postgres_repmgr
-    hostname: postgres_repmgr_node_2
+    hostname: postgres_repmgr_node_1
     build:
       context: ./
       dockerfile: postgresql_repmgr/dockerfile_postgresql_repmgr
@@ -13,12 +11,11 @@ services:
         REPMGR_USER_PASSWORD: repmgr
         REPMGR_DB: repmgr #name database for repmgr service
         node_id: 2 #repmgr node id (unique)
-        host_ip: '192.168.1.102' #host ip address this machine
-        postgresql_port: '5432' #port postgresql
+        host_ip: '192.168.48.24' #host ip address this machine
         priority: 90 #prority change node for new master (repmgr)
     networks:
       myvlan:
-        ipv4_address: 192.168.1.102
+        ipv4_address: 192.168.48.24
     volumes:
       - pgsql:/var/lib/pgsql/
       - log:/var/log/postgresql/
@@ -39,11 +36,11 @@ services:
         REPMGR_DB: repmgr #name database for repmgr service
         PGPOOL_USER: repmgr
         PGPOOL_USER_PASSWORD: repmgr
-        host_ip: '192.168.1.92' #host ip address this machine
-        delegate_IP: '192.168.1.90' #virtual ip
+        host_ip: '192.168.48.22' #host ip address this machine
+        delegate_IP: '192.168.48.20' #virtual ip
     networks:
       myvlan:
-        ipv4_address: 192.168.1.92
+        ipv4_address: 192.168.48.22
     volumes:
       - pgpool:/etc/pgpool-II-11/
       - pgpool_pgsql:/var/lib/pgsql/
@@ -66,9 +63,9 @@ volumes:
 
 networks:
   myvlan:
-    driver: macvlan
+    driver: ipvlan
     driver_opts:
-      parent: eth0
+      parent: ens160
     ipam:
       config:
-        - subnet: 192.168.1.89/24
+        - subnet: 192.168.48.0/24
