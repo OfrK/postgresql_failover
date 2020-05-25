@@ -37,7 +37,7 @@ https://docs.docker.com/engine/
 3) Docker network https://docs.docker.com/network/network-tutorial-macvlan/ (kernel linux)
  
 ##Разворачивание контейнеров
-###Подготовка docker-compose\
+###Подготовка docker-compose
 Первое что нужно подготовить - docker-compose, зеленым цветом подсвечено что необходимо менять.\
 Настроить сеть докера, в данной сборке можно использовать macvlan и ipvlan сеть, задается в "driver: " \
 https://docs.docker.com/network/ все по сети \
